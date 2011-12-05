@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 import sys
 import os
 
@@ -33,7 +34,7 @@ class Main(QtGui.QMainWindow):
 
         self.imageView = ImageView(parent=self)
         self.setCentralWidget( self.imageView )
-        self.resize(1100, 900)
+        self.resize(1200, 900)
         
         # make widgets
         self.makePropertiesDockWidget()
@@ -554,11 +555,9 @@ class ImageView( QtGui.QGraphicsView ):
                                     self.verticalScrollBar().value())
 
     def leaveEvent( self, event):
-        print "leaveEvent"
         QtGui.QApplication.restoreOverrideCursor()
         
     def enterEvent( self, event):
-        print "enterEvent"
         if self.mode == 'drawAxisMode':
             self.setDrawAxisMode()
         if self.mode == 'addPointMode':

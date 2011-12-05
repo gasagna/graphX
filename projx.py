@@ -1,9 +1,11 @@
 import sys
+import os
 
 import numpy as np
 from PyQt4 import QtCore,QtGui
 
 """WISHES:
+* sistema il drag and drop dei vari elementi
 * mettere icona vicino ad ogni punto con il colore del punto
 * dockbar con tipi di simboli e colori
 * regression tool
@@ -11,16 +13,15 @@ from PyQt4 import QtCore,QtGui
 """
 
 """TODO:
-* double click on an rectpoint ask true positions
+* about window
 * logarithmic mapping
 * quando fai il wheelEvent fai si che zoomi nella posizione voluta.
 * reorder and complete help list
 """
 
 """BUGS:
-* sistema il drag and drop dei vari elementi
+* draw_rect ordine dei punti
 * quadrato dello zoom o selezione
-* se il file di immagine non is buono scrivi un messaggio
 """
 
 zoomFactor = 1.05
@@ -28,10 +29,11 @@ zoomFactor = 1.05
 class Main(QtGui.QMainWindow):
     def __init__(self):
         QtGui.QMainWindow.__init__(self)
+        self.setWindowTitle( QtCore.QString('GraphX') ) 
 
         self.imageView = ImageView(parent=self)
         self.setCentralWidget( self.imageView )
-        self.resize(900, 700)
+        self.resize(1100, 900)
         
         # make widgets
         self.makePropertiesDockWidget()
@@ -157,6 +159,7 @@ class Main(QtGui.QMainWindow):
         # build button box
         hbox = QtGui.QHBoxLayout()
         button = QtGui.QPushButton( 'Save these points' )
+        self.connect( button, QtCore.SIGNAL('clicked()'), self.onSavePointsButtonClicked )
         hbox.addStretch()
         hbox.addWidget(button)
         
@@ -170,26 +173,7 @@ class Main(QtGui.QMainWindow):
         self.pointDock.setWidget(widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea(1), self.pointDock)
         self.pointDock.hide()
-        
-    def makeRectDockWidget( self ):
-        self.rectDock = QtGui.QDockWidget()
-        self.rectDock.setWindowTitle("Rectangle Points")
 
-        # build table for points
-        self.rectTable = RectTable(self)
-        
-        # build dockwidget widget
-        widget = QtGui.QWidget(self)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
-        widget.setSizePolicy(sizePolicy)
-        vbox = QtGui.QVBoxLayout()
-        vbox.addWidget(self.rectTable)
-        widget.setLayout(vbox)
-        
-        self.rectDock.setWidget(widget)
-        self.addDockWidget(QtCore.Qt.DockWidgetArea(1), self.rectDock)
-        self.rectDock.hide()
-        
     def makePropertiesDockWidget( self ):
         self.propDock = QtGui.QDockWidget()
         self.propDock.setWindowTitle("Axis Properties")
@@ -215,22 +199,17 @@ class Main(QtGui.QMainWindow):
         self.addDockWidget(QtCore.Qt.DockWidgetArea(1), self.propDock)
         self.propDock.hide()
 
-
-class RectTable( QtGui.QTableWidget):
-    def __init__( self, parent ):
-        QtGui.QTableWidget.__init__( self, parent )
-        self.horizontalHeader().setStretchLastSection(True)
-        self.setColumnCount(2)
-        self.setHorizontalHeaderLabels( ['x', 'y'] )
-        self.setRowCount(4)
-        self.counter = 0
+    def onSavePointsButtonClicked( self ):
+        filename = QtGui.QFileDialog.getSaveFileName( self, 'Save data point', os.path.expanduser('~') )
+        points = []
+        for i in range( self.pointsTable.topLevelItemCount() ):
+            x = self.pointsTable.topLevelItem(i).text(0)
+            y = self.pointsTable.topLevelItem(i).text(1)
+            points.append( (float(x),float(y)) )
         
-    def displayPoint( self, rectPoint ):
-        xitem = QtGui.QTableWidgetItem( "%.2e" % rectPoint.truePos().x() )
-        yitem = QtGui.QTableWidgetItem( "%.2e" % rectPoint.truePos().y() )
-        self.setItem(self.counter, 0, xitem)
-        self.setItem(self.counter, 1, yitem)
-        self.counter += 1
+        arr = np.array( points )
+        print arr
+        np.savetxt( str(filename), arr )
 
 
 class ImageView( QtGui.QGraphicsView ):
@@ -304,9 +283,9 @@ class ImageView( QtGui.QGraphicsView ):
 
         # create font
         font = QtGui.QFont('Sans', 11)
-        hint_text = scene.addText( "press ? for help at anytime", font )
+        hint_text = scene.addText( "You can press ? for help at anytime", font )
         hint_text.setDefaultTextColor( QtGui.QColor("#323232") )
-        hint_text.setPos( 90, 35 )
+        hint_text.setPos( 50, 35 )
 
         self.setScene(scene)
 
@@ -322,10 +301,15 @@ class ImageView( QtGui.QGraphicsView ):
         self.scene().destroyItemGroup(group)
 
     def on_load_image_clicked( self ):
-        """Get an image and show it."""
-        # get filename
+        # get filename and load image, if it can 
         filename = QtGui.QFileDialog.getOpenFileName()
-
+        reader = QtGui.QImageReader(filename)
+        if not reader.canRead():
+            QtGui.QMessageBox.warning(self,
+                "Error",
+                "Sorry, I cannot read this file.")
+            return 
+            
         # we have a pixmap
         image = QtGui.QPixmap(filename)
 
@@ -466,6 +450,11 @@ class ImageView( QtGui.QGraphicsView ):
             # move each point
             for item in self.scene().selectedItems():
                 item.move(deltax, deltay)
+                if isinstance( item, Point ):
+                    item.setTruePos( self.mapper.map( item.scenePos() ) )
+                    twitem = self.parent().pointsTable.topLevelItem( item.counter )
+                    twitem.setText( 0, "%.4e" % item.truePos().x() )
+                    twitem.setText( 1, "%.4e" % item.truePos().y() )
     
             # then redraw axis rectangle
             self.draw_axis_rect()
@@ -486,9 +475,11 @@ class ImageView( QtGui.QGraphicsView ):
                             min( self.imagePixmap.pixmap().width(), self.imagePixmap.pixmap().height()),
                             counter=len(self.axis_points) )
                             
-                    ok = rpoint.askTruePos( )
+                    truePos, ok = self.askTruePos( )
+                    self.setDrawAxisMode()
                     
                     if ok:
+                        rpoint.setTruePos( truePos )
                         self.scene().addItem( rpoint )
                         self.axis_points.append( rpoint )
     
@@ -500,6 +491,7 @@ class ImageView( QtGui.QGraphicsView ):
                         QtGui.QApplication.restoreOverrideCursor()
                         # set draw axis action enabled
                         self.parent().toolbar.actions['addPointAction'].setEnabled(True)
+                        self.parent().toolbar.actions['drawAxisAction'].setEnabled(False)
                     
         # ADD POINTS, these are the data point of which we want to obtain the position
         elif event.button() == 1 and self.mode == 'addPointMode':
@@ -507,7 +499,10 @@ class ImageView( QtGui.QGraphicsView ):
             if self.itemAt( event.pos() ):
 
                 # create ellipse item
-                ell = Point( self.mapToScene(event.pos()), min( self.imagePixmap.pixmap().width(), self.imagePixmap.pixmap().height() ), parent=self.scene() )
+                ell = Point( self.mapToScene(event.pos()), 
+                     min( self.imagePixmap.pixmap().width(), self.imagePixmap.pixmap().height() ),
+                     counter=len(self.points) )
+                ell.setTruePos( self.mapper.map( ell.scenePos() ) )
 
                 # add it to the scene and get pointer
                 pointer = self.scene().addItem( ell )
@@ -518,16 +513,14 @@ class ImageView( QtGui.QGraphicsView ):
                 # build item and create
                 truepoint = self.mapper.map(ell.scenePos())
                 item = QtGui.QTreeWidgetItem()
-                item.setText( 0, "%.2e" % truepoint.x() )
-                item.setText( 1, "%.2e" % truepoint.y() )
+                item.setText( 0, "%.4e" % truepoint.x() )
+                item.setText( 1, "%.4e" % truepoint.y() )
                 self.parent().pointsTable.addTopLevelItem(item)
                 
         # SELECT POINTS
         elif event.button() == 1 and self.mode == 'selectMode':
-            
-            #if isinstance( self.itemAt( event.pos() ), RectPoint):
-            #    self.itemAt( event.pos()).mouseDoubleClickEvent( event )
-            
+
+            # what is this??
             self.hasMoved = False
             
             # point of the rectangle of selection
@@ -535,6 +528,7 @@ class ImageView( QtGui.QGraphicsView ):
             
             # get clicked item
             item = self.itemAt( event.pos() )
+            print item
             
             # if it is a point highlight it, otherwise clear selection
             if isinstance( item, Point ) or isinstance( item, RectPoint ) :
@@ -559,6 +553,17 @@ class ImageView( QtGui.QGraphicsView ):
             self.startScroll = (self.horizontalScrollBar().value(),
                                     self.verticalScrollBar().value())
 
+    def leaveEvent( self, event):
+        print "leaveEvent"
+        QtGui.QApplication.restoreOverrideCursor()
+        
+    def enterEvent( self, event):
+        print "enterEvent"
+        if self.mode == 'drawAxisMode':
+            self.setDrawAxisMode()
+        if self.mode == 'addPointMode':
+            self.setAddPointMode()
+
     def mouseMoveEvent(self, event):
         # if we have drawn a rectangle
         if self.has_rect:
@@ -581,23 +586,7 @@ class ImageView( QtGui.QGraphicsView ):
             # add new rectangle
             self.selectionRect = self.scene().addRect(selectionRect, QtGui.QPen(QtCore.Qt.SolidLine), QtGui.QBrush(QtGui.QColor(187,48,51,10)))
             
-            # if there is nothing to be dragged
-            #if not self.scene().selectedItems():
-            #    return
-
-            # this is the location of the click and drag event
-            #point = self.mapToScene(event.pos())
-
-            # compute distance and move items
-            #dx = self.clickDragPosition.x()-point.x()
-            #dy = self.clickDragPosition.y()-point.y()
-            #for item in self.scene().selectedItems():
-            #    item.move(dx, dy)
-            
-            # draw axis rectangle
-            #if self.has_rect:
-            #    self.draw_axis_rect()
-
+  
         elif self.mode == 'zoomMode':
             # if we are is zoom mode
             if self.initialZoomPoint is None:
@@ -619,7 +608,7 @@ class ImageView( QtGui.QGraphicsView ):
                 self.verticalScrollBar().setValue(self.startScroll[1] -
                                                         globalPos.y() +
                                                         self.lastPos.y())
-                                                    
+
     def mouseReleaseEvent(self, event):
         # delete zoom rectangle and fit view
         if self.initialZoomPoint:
@@ -646,6 +635,33 @@ class ImageView( QtGui.QGraphicsView ):
         self.hasMoved=False
         self.lastPos = False
 
+    def askTruePos( self ):
+        # display error message function
+        def showError():
+            QtGui.QMessageBox.warning(self,
+                "Error",
+                "The inserted point is not valid")
+        
+        # open dialog
+        dialog = QtGui.QInputDialog()
+        #dialog.setTextValue( "%f %f" % (self._truePos.x(), self._truePos.y()) )
+        point, ok = dialog.getText(self, 'Input dialog', 'Enter true coordinates of the point, (separated by space):')
+
+        if ok:
+            try:
+                pos = [float(element) for element in str(point).split()]
+            except ValueError:
+                showError()
+                return None, False
+        else:
+            return None, False
+            
+        if len(pos) != 2:
+           showError()
+           return None, False
+            
+        return QtCore.QPointF( pos[0], pos[1] ), True
+
     def draw_axis_rect( self ):
         if self.has_rect:
             # get new points
@@ -653,7 +669,6 @@ class ImageView( QtGui.QGraphicsView ):
             for item in self.axis_points:
                 points.append(  QtCore.QPointF( item.scenePos().x(), item.scenePos().y() ) )
     
-            # redefine polygon defining axis
             axis_rect = QtGui.QPainterPath( points[0] )
             for i in range(1,4):
                 axis_rect.lineTo( points[i] )
@@ -669,21 +684,19 @@ class ImageView( QtGui.QGraphicsView ):
             self.path = self.scene().addPath( axis_rect, QtGui.QPen(color), QtGui.QBrush(QtGui.QColor(50,50,250,5)) )
             
             # compute mapping from scene to true coordinates
-            self.mapper.fit( scene_pos = [ (el.scenePos().x(), el.scenePos().y()) for el in self.axis_points],
-                              true_pos = [ (el.truePos.x(), el.truePos.y()) for el in self.axis_points ] )
-
-    def contextMenuEvent(self, event):
-        #change value of point
-        #changeValueAction = QtGui.QAction(QtGui.QIcon(''), 'Change true value', self)
-        #changeValueAction.triggered.connect( self.ask_coordinate )
-
-        #menu = QtGui.QMenu( self )
-        #menu.addAction(changeValueAction)
-
-        ## if we are clicking on one of the axes rect ellispes
-        #if self.itemAt( event.pos() ) in self.axis_points:
-        #    menu.exec_(self.mapToGlobal(event.pos()))
-        pass
+            scene_pos = [ (el.scenePos().x(), el.scenePos().y()) for el in self.axis_points]
+            true_pos  = [ (el.truePos().x(), el.truePos().y()) for el in self.axis_points ] 
+            
+            # if the user selects an impossible mapping
+            if not self.mapper.fit( scene_pos, true_pos ):
+                self.scene().removeItem(self.path)
+                for point in self.axis_points:
+                    self.scene().removeItem(point)
+                QtGui.QMessageBox.warning(self,
+                    "Error",
+                    "This is impossible! How did you get in here? Did you set two equal points?")
+                self.has_rect = False
+                self.parent().toolbar.actions['drawAxisAction'].setEnabled(False)
 
 
 class HelpOverlay(QtGui.QWidget):
@@ -721,29 +734,31 @@ class HelpOverlay(QtGui.QWidget):
         painter.setFont(cfont)
 
         # all the shortcuts
-        keys = { 'd': "Draw axes",
-                 'a': "Add point",
-                 's': "Select tool",
-                 'z': "Zoom tool",
-                 'x': "Pan view to cursor position",
-                 'f': "Fit image to window",
-                 '?': "Show this help screen",
-                 'mouse wheel': "Zoom",
-                 'right click': "select a point",
-                 'Esc': "Hide this help screen",
-                 'arrows': "Move selected point",
-                 'Ctrl + arrows': "Move selected point a little bit more",
-                 'Shift + arrows': "Move selected point a much more",
-                 'Esc': "Hide this help screen",
-                 }
+        keys = { 'd': "set 'Draw axes' mode",
+                 'a': "set 'Add points' mode",
+                 's': "set 'Select points' mode",
+                 'z': "set 'Zoom' mode",
+                 'x': "pan view to cursor position",
+                 'f': "fit image to window",
+                 'o': "fit selected objects to window",
+                 '?': "show this help screen",
+                 'mouse wheel': "zoom",
+                 'right click on a point': "select a point",
+                 'double click on a point': "change its true position",
+                 'Esc': "hide this help screen",
+                 'arrows': "move selected point",
+                 'Ctrl + arrows': "move selected point a little bit more",
+                 'Shift + arrows': "move selected point much more"}
 
         # spacing between keys
         spacing = 20
+        
+        key_order = ['d', 'a', 's', 'z', 'x', 'f', 'o', '?', 'mouse wheel', 'right click on a point', 'double click on a point', 'arrows', 'Ctrl + arrows', 'Shift + arrows', 'Esc']
 
         # write
-        for i, (key, value) in enumerate( keys.iteritems() ):
-            key_rect = QtCore.QRectF( self.parent().width()/2-220, 250+i*spacing, 500, 100 )
-            painter.drawText( key_rect, QtCore.QString('%s : %s' % (key.rjust( max( map(len, keys.keys()) )), value)) )
+        for i, key in enumerate( key_order) :
+            key_rect = QtCore.QRectF( self.parent().width()/2-280, 250+i*spacing, 700, 100 )
+            painter.drawText( key_rect, QtCore.QString('%s : %s' % (key.rjust( max( map(len, keys.keys()) )), keys[key])) )
 
 
         # end
@@ -769,8 +784,12 @@ class Mapper( object ):
         V = np.hstack( (xs, ys, xs*ys, np.ones_like(xs)) ).astype(np.float32)
 
         # solution of the linear transform
-        self._coeffsX = np.linalg.solve( V, xt )
-        self._coeffsY = np.linalg.solve( V, yt )
+        try:
+            self._coeffsX = np.linalg.solve( V, xt )
+            self._coeffsY = np.linalg.solve( V, yt )
+            return True
+        except np.linalg.LinAlgError:
+            return False
 
     def map( self, point ):
         """Map from scene to true value"""
@@ -787,7 +806,10 @@ class Point( QtGui.QGraphicsItem ):
     selectedEdgeColor = QtGui.QColor('red')
     faceColor = QtGui.QColor(164, 84, 188, 200)
     
-    def __init__ ( self, pointCenter, imageSize):
+    def __init__ ( self, pointCenter, imageSize, counter ):
+        self._truePos = QtCore.QPointF(0,0)
+        self.counter = counter
+        
         # size of the circle
         self.circleSize = imageSize*self.size
         
@@ -800,8 +822,12 @@ class Point( QtGui.QGraphicsItem ):
         self.setAcceptDrops(True)
         self.setFlags( QtGui.QGraphicsItem.ItemIsSelectable )
         
-        # are we on the ellipse?
-        self.hovering = False
+    def setTruePos(self, truePos):
+        self._truePos = truePos
+        self.setToolTip( "Point is at: %.5e, %.5e)" % (self._truePos.x(), self._truePos.y()) )
+    
+    def truePos(self):
+        return self._truePos
         
     def scenePos( self ):
         return QtCore.QPointF( self.rect.x()+self.circleSize/2, self.rect.y()+self.circleSize/2)
@@ -842,14 +868,12 @@ class RectPoint( Point ):
     faceColor = QtGui.QColor(80, 164, 67, 200)
 
     def __init__( self, pointCenter, imageSize, counter ):
-        super(RectPoint, self).__init__( pointCenter, imageSize )
-        self._truePos = QtCore.QPointF(0,0)
-        self.counter = counter
+        super(RectPoint, self).__init__( pointCenter, imageSize,counter )
         
         # the small tet label we show for each rectangle point
         self.textItem = QtGui.QGraphicsTextItem( '(%.2e, %.2e)' % (self._truePos.x(), self._truePos.y()) )
         self.textItem.setPos( self.scenePos().x()-55, self.scenePos().y()-25 )
-        self.textItem.setFont(QtGui.QFont('Monospace', 7))
+        self.textItem.setFont(QtGui.QFont('Monospace', 9))
         self.textItem.setParentItem(self)
         
     def setTruePos(self, truePos):
@@ -857,14 +881,6 @@ class RectPoint( Point ):
         self.setToolTip( "Point %d is at: %.5e, %.5e)" % (self.counter+1, self._truePos.x(), self._truePos.y()) )
         self.textItem.setPlainText( '(%.2e, %.2e)' % (self._truePos.x(), self._truePos.y() ))
     
-    def truePos(self):
-        return self._truePos
-        
-    def move( self, dx, dy ):
-        self.prepareGeometryChange()
-        self.rect = QtCore.QRectF(self.rect.x()+dx, self.rect.y()+dy, self.circleSize, self.circleSize )
-        self.textItem.setPos( self.scenePos().x()-55, self.scenePos().y()-25 )
-        
     def paint(self, painter, option, widget):
        
         if self.isSelected():
@@ -885,41 +901,18 @@ class RectPoint( Point ):
         path = QtGui.QPainterPath()
         path.moveTo( self.scenePos().x() - self.circleSize*0.46, self.scenePos().y() )
         path.lineTo( self.scenePos().x() + self.circleSize*0.46, self.scenePos().y() )
-        painter.setPen(QtGui.QPen(QtGui.QColor('white'), 0.02*self.circleSize) )
+        painter.setPen(QtGui.QPen(QtGui.QColor('white'), 0.04*self.circleSize) )
         painter.drawPath(path)
         path.moveTo( self.scenePos().x(), self.scenePos().y()+self.circleSize*0.46 )
         path.lineTo( self.scenePos().x(), self.scenePos().y()-self.circleSize*0.46 )
         painter.drawPath(path)
         
     def mouseDoubleClickEvent(self, event):
-        self.askCoordinates()
-        
-    def askTruePos( self ):
-        
-        # display error message function
-        def showError():
-            QtGui.QMessageBox.warning(self,
-                "Error",
-                "The inserted point is not valid")
-        
-        # open dialog
-        dialog = QtGui.QInputDialog()
-        dialog.setTextValue( "%f %f" % (self._truePos.x(), self._truePos.y()) )
-        point, ok = dialog.getText(self, 'Input dialog', 'Enter true coordinates of the point, (separated by space):')
-        
+        truePos, ok = self.scene().views()[0].askTruePos()
         if ok:
-            try:
-                pos = [float(element) for element in str(point).split()]
-            except ValueError:
-                showError()
-                return 
-        
-        if len(pos) != 2:
-            showError()
-            return 
-            
-        self.setTruePos( pos )
-        
+            self.setTruePos( truePos )
+
+
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
     window=Main()

@@ -1,0 +1,17 @@
+Thank you for testing this beta version of graphX!
+
+Before installing you should have installed in your 
+system some dependencies. On Ubuntu run this command 
+in a terminal to get all the required stuff:
+  
+  sudo apt-get install python-qt4 python-numpy
+
+Then, to install graphX run:
+  
+  sudo python setup.py install
+
+You should then be able to launch graphX from the 
+command line.
+
+----------------------------------------------------
+Please, report bugs at lasagnadavide at gmail dot com

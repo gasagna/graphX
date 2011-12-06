@@ -21,6 +21,7 @@ from PyQt4 import QtCore,QtGui
 """
 
 """BUGS:
+* selezione dei punti (ctrl)
 * draw_rect ordine dei punti
 * quadrato dello zoom o selezione
 """
@@ -305,6 +306,10 @@ class ImageView( QtGui.QGraphicsView ):
         # get filename and load image, if it can 
         filename = QtGui.QFileDialog.getOpenFileName()
         reader = QtGui.QImageReader(filename)
+        
+        if not filename:
+            return 
+            
         if not reader.canRead():
             QtGui.QMessageBox.warning(self,
                 "Error",
@@ -451,7 +456,7 @@ class ImageView( QtGui.QGraphicsView ):
             # move each point
             for item in self.scene().selectedItems():
                 item.move(deltax, deltay)
-                if isinstance( item, Point ):
+                if isinstance( item, Point ) and not isinstance( item, RectPoint ):
                     item.setTruePos( self.mapper.map( item.scenePos() ) )
                     twitem = self.parent().pointsTable.topLevelItem( item.counter )
                     twitem.setText( 0, "%.4e" % item.truePos().x() )
@@ -910,6 +915,11 @@ class RectPoint( Point ):
         truePos, ok = self.scene().views()[0].askTruePos()
         if ok:
             self.setTruePos( truePos )
+            
+    def move( self, dx, dy):
+        self.prepareGeometryChange()
+        self.rect = QtCore.QRectF(self.rect.x()+dx, self.rect.y()+dy, self.circleSize, self.circleSize )
+        self.textItem.setPos( self.scenePos().x()-55, self.scenePos().y()-25 )
 
 
 if __name__ == "__main__":

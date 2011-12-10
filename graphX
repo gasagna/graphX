@@ -31,18 +31,18 @@ zoomFactor = 1.05
 class Main(QtGui.QMainWindow):
     def __init__(self):
         QtGui.QMainWindow.__init__(self)
-        self.setWindowTitle( QtCore.QString('GraphX') ) 
+        self.setWindowTitle( QtCore.QString('GraphX') )
 
         self.imageView = ImageView(parent=self)
         self.setCentralWidget( self.imageView )
         self.resize(1200, 900)
-        
+
         # make widgets
         self.makePropertiesDockWidget()
         self.makePointsDockWidget()
         self.makeToolBar()
         self.makeStatusBar()
-        
+
     def makeToolBar( self ):
         # make toolbar
         loadImageAction = QtGui.QAction(QtGui.QIcon.fromTheme("insert-image"), 'Load Image', self)
@@ -50,7 +50,7 @@ class Main(QtGui.QMainWindow):
         loadImageAction.setToolTip( QtCore.QString("Load an image into the application") )
         loadImageAction.triggered.connect( self.imageView.on_load_image_clicked )
         loadImageAction.setCheckable(False)
-        
+
         drawAxisAction = QtGui.QAction(QtGui.QIcon.fromTheme("select-rectangular"), 'Draw Axis', self)
         drawAxisAction.setShortcut('d')
         drawAxisAction.setEnabled(False)
@@ -71,7 +71,7 @@ class Main(QtGui.QMainWindow):
         selectPointsAction.setEnabled(False)
         selectPointsAction.setToolTip( QtCore.QString("Select points") )
         selectPointsAction.triggered.connect( self.imageView.setSelectPointMode )
-        
+
         panAction = QtGui.QAction(QtGui.QIcon.fromTheme("transform-move"), 'Pan view', self)
         panAction.setShortcut('p')
         panAction.setCheckable(True)
@@ -92,8 +92,8 @@ class Main(QtGui.QMainWindow):
         fitAction.setEnabled(False)
         fitAction.setToolTip( QtCore.QString("Fit the view to the image") )
         fitAction.triggered.connect( self.imageView.fit )
-        
-        
+
+
         fitObjectsAction = QtGui.QAction(QtGui.QIcon.fromTheme("zoom-draw"), 'Fit Objects', self)
         fitObjectsAction.setShortcut('o')
         fitObjectsAction.setCheckable(False)
@@ -101,7 +101,10 @@ class Main(QtGui.QMainWindow):
         fitObjectsAction.setToolTip( QtCore.QString("Fit the view to the selected objects") )
         fitObjectsAction.triggered.connect( self.imageView.fitObjects )
 
-    
+        aboutAction = QtGui.QAction(QtGui.QIcon.fromTheme("help-about"), 'About grapX', self)
+        aboutAction.setEnabled(True)
+        aboutAction.triggered.connect( self.onAboutButtonPressed )
+
         self.toolbar = QtGui.QToolBar()
         self.toolbar.actions = { 'loadImageAction'     : loadImageAction,
                                  'drawAxisAction'      : drawAxisAction,
@@ -111,7 +114,7 @@ class Main(QtGui.QMainWindow):
                                  'zoomAction'          : zoomAction,
                                  'fitAction'           : fitAction,
                                  'fitObjectsAction'     : fitObjectsAction,                                   }
-                            
+
         self.toolbar.setToolButtonStyle( QtCore.Qt.ToolButtonTextUnderIcon )
         self.toolbar.addAction(loadImageAction)
         self.toolbar.addAction(drawAxisAction)
@@ -121,20 +124,26 @@ class Main(QtGui.QMainWindow):
         self.toolbar.addAction(zoomAction)
         self.toolbar.addAction(fitAction)
         self.toolbar.addAction(fitObjectsAction)
-        
+        self.toolbar.addAction(aboutAction)
+
         self.addToolBar( self.toolbar )
-        
+
+    def onAboutButtonPressed( self ):
+        message = "A tool to extract data from graphics.\nCopyright 2011 Lasagna Davide\nversion 0.1"
+        dialog = QtGui.QMessageBox.about( self, QtCore.QString('About graphX'), QtCore.QString(message) )
+
+
     def makeStatusBar( self ):
         # statusbar
         sb = QtGui.QStatusBar( self )
         sb.setFixedHeight(20)
         self.setStatusBar(sb)
-        
+
         # labels for the status bar
         label = QtGui.QLabel(QtCore.QString('Ready'))
         self.statusBar().addPermanentWidget( label )
         self.statusBar().statusLabel = label
-        
+
         label = QtGui.QLabel(QtCore.QString(''))
         self.statusBar().insertWidget( 0, label )
         self.statusBar().positionLabel = label
@@ -157,21 +166,21 @@ class Main(QtGui.QMainWindow):
         item.setText(1, 'y')
         self.pointsTable.setHeaderItem(item)
         self.pointsTable.setColumnCount(2)
-        
+
         # build button box
         hbox = QtGui.QHBoxLayout()
         button = QtGui.QPushButton( 'Save these points' )
         self.connect( button, QtCore.SIGNAL('clicked()'), self.onSavePointsButtonClicked )
         hbox.addStretch()
         hbox.addWidget(button)
-        
+
         # build dockwidget widget
         widget = QtGui.QWidget(self)
         vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.pointsTable)
         vbox.addLayout(hbox)
         widget.setLayout(vbox)
-        
+
         self.pointDock.setWidget(widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea(1), self.pointDock)
         self.pointDock.hide()
@@ -196,7 +205,7 @@ class Main(QtGui.QMainWindow):
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
         widget.setSizePolicy(sizePolicy)
         #widget.setLayout(gridlayout)
-        
+
         self.propDock.setWidget(widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea(1), self.propDock)
         self.propDock.hide()
@@ -208,7 +217,7 @@ class Main(QtGui.QMainWindow):
             x = self.pointsTable.topLevelItem(i).text(0)
             y = self.pointsTable.topLevelItem(i).text(1)
             points.append( (float(x),float(y)) )
-        
+
         arr = np.array( points )
         print arr
         np.savetxt( str(filename), arr )
@@ -244,14 +253,14 @@ class ImageView( QtGui.QGraphicsView ):
         # initial point of zoom rectangle
         self.initialZoomPoint = None
         self.zoomRect = QtGui.QGraphicsRectItem()
-        
+
         # initial point of the selection rectangle
         self.initialSelectionPoint = None
         self.selectionRect = QtGui.QGraphicsRectItem()
 
         # get position of the cursor
         self.setMouseTracking(True)
-        self.setAcceptDrops(True) 
+        self.setAcceptDrops(True)
 
         # a group of 4 points used to draw the axes polygon
         self.axis_points = []
@@ -270,7 +279,7 @@ class ImageView( QtGui.QGraphicsView ):
 
         # is the help screen shown?
         self.help_is_shown = False
-        
+
         self.lastPos = False
 
     def init_message(self):
@@ -303,19 +312,19 @@ class ImageView( QtGui.QGraphicsView ):
         self.scene().destroyItemGroup(group)
 
     def on_load_image_clicked( self ):
-        # get filename and load image, if it can 
+        # get filename and load image, if it can
         filename = QtGui.QFileDialog.getOpenFileName()
         reader = QtGui.QImageReader(filename)
-        
+
         if not filename:
-            return 
-            
+            return
+
         if not reader.canRead():
             QtGui.QMessageBox.warning(self,
                 "Error",
                 "Sorry, I cannot read this file.")
-            return 
-            
+            return
+
         # we have a pixmap
         image = QtGui.QPixmap(filename)
 
@@ -323,14 +332,14 @@ class ImageView( QtGui.QGraphicsView ):
         self.scene().clear()
         self.scene().setSceneRect( 0, 0, image.width(), image.height() )
         self.imagePixmap = self.scene().addPixmap( image )
-        
+
         # show docks
         self.parent().pointDock.show()
         #self.parent().propDock.show()
-        
+
         # fit view
         self.fitInView( self.scene().sceneRect(), QtCore.Qt.KeepAspectRatio)
-        
+
         # enable some actions
         self.parent().toolbar.actions['drawAxisAction'].setEnabled(True)
         self.parent().toolbar.actions['selectPointsAction'].setEnabled(True)
@@ -338,7 +347,7 @@ class ImageView( QtGui.QGraphicsView ):
         self.parent().toolbar.actions['panAction'].setEnabled(True)
         self.parent().toolbar.actions['fitAction'].setEnabled(True)
         self.parent().toolbar.actions['fitObjectsAction'].setEnabled(True)
-        
+
     def sendSBMode(self):
         self.parent().statusBar().statusLabel.setText( self.mode )
 
@@ -351,10 +360,10 @@ class ImageView( QtGui.QGraphicsView ):
         self.sendSBMode()
         QtGui.QApplication.restoreOverrideCursor()
         QtGui.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CrossCursor))
-        
+
         for action in self.parent().toolbar.actions.values():
             action.associatedWidgets()[1].setChecked(False)
-        
+
         self.parent().toolbar.actions['drawAxisAction'].associatedWidgets()[1].setChecked(True)
 
     def setAddPointMode(self):
@@ -363,7 +372,7 @@ class ImageView( QtGui.QGraphicsView ):
         self.sendSBMode()
         QtGui.QApplication.restoreOverrideCursor()
         QtGui.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CrossCursor))
-        
+
         for action in self.parent().toolbar.actions.values():
             action.associatedWidgets()[1].setChecked(False)
         self.parent().toolbar.actions['addPointAction'].associatedWidgets()[1].setChecked(True)
@@ -373,7 +382,7 @@ class ImageView( QtGui.QGraphicsView ):
         self.mode = 'selectMode'
         self.sendSBMode()
         QtGui.QApplication.restoreOverrideCursor()
-        
+
         for action in self.parent().toolbar.actions.values():
             action.associatedWidgets()[1].setChecked(False)
         self.parent().toolbar.actions['selectPointsAction'].associatedWidgets()[1].setChecked(True)
@@ -386,7 +395,7 @@ class ImageView( QtGui.QGraphicsView ):
         for action in self.parent().toolbar.actions.values():
             action.associatedWidgets()[1].setChecked(False)
         self.parent().toolbar.actions['zoomAction'].associatedWidgets()[1].setChecked(True)
-        
+
     def setPanMode(self):
         """"""
         self.mode = 'panMode'
@@ -461,7 +470,7 @@ class ImageView( QtGui.QGraphicsView ):
                     twitem = self.parent().pointsTable.topLevelItem( item.counter )
                     twitem.setText( 0, "%.4e" % item.truePos().x() )
                     twitem.setText( 1, "%.4e" % item.truePos().y() )
-    
+
             # then redraw axis rectangle
             self.draw_axis_rect()
 
@@ -469,26 +478,26 @@ class ImageView( QtGui.QGraphicsView ):
         # LOAD IMAGE INTO VIEW
         if event.button() == 1 and not self.imagePixmap:
             self.on_load_image_clicked()
-            
+
         # DRAW AXIS POINTS
         elif event.button() == 1 and self.mode == 'drawAxisMode':
             # if we dont already have a rect
             if not self.has_rect:
                 # if we click on the image
                 if self.itemAt( event.pos() ):
-    
+
                     rpoint = RectPoint( self.mapToScene(event.pos()),
                             min( self.imagePixmap.pixmap().width(), self.imagePixmap.pixmap().height()),
                             counter=len(self.axis_points) )
-                            
+
                     truePos, ok = self.askTruePos( )
                     self.setDrawAxisMode()
-                    
+
                     if ok:
                         rpoint.setTruePos( truePos )
                         self.scene().addItem( rpoint )
                         self.axis_points.append( rpoint )
-    
+
                     if len(self.axis_points) == 4:
                         self.has_rect = True
                         self.draw_axis_rect()
@@ -498,14 +507,14 @@ class ImageView( QtGui.QGraphicsView ):
                         # set draw axis action enabled
                         self.parent().toolbar.actions['addPointAction'].setEnabled(True)
                         self.parent().toolbar.actions['drawAxisAction'].setEnabled(False)
-                    
+
         # ADD POINTS, these are the data point of which we want to obtain the position
         elif event.button() == 1 and self.mode == 'addPointMode':
             # if we click on the image
             if self.itemAt( event.pos() ):
 
                 # create ellipse item
-                ell = Point( self.mapToScene(event.pos()), 
+                ell = Point( self.mapToScene(event.pos()),
                      min( self.imagePixmap.pixmap().width(), self.imagePixmap.pixmap().height() ),
                      counter=len(self.points) )
                 ell.setTruePos( self.mapper.map( ell.scenePos() ) )
@@ -515,27 +524,27 @@ class ImageView( QtGui.QGraphicsView ):
 
                 # remember added points
                 self.points.append( pointer )
-                
+
                 # build item and create
                 truepoint = self.mapper.map(ell.scenePos())
                 item = QtGui.QTreeWidgetItem()
                 item.setText( 0, "%.4e" % truepoint.x() )
                 item.setText( 1, "%.4e" % truepoint.y() )
                 self.parent().pointsTable.addTopLevelItem(item)
-                
+
         # SELECT POINTS
         elif event.button() == 1 and self.mode == 'selectMode':
 
             # what is this??
             self.hasMoved = False
-            
+
             # point of the rectangle of selection
             self.initialSelectionPoint = event.pos()
-            
+
             # get clicked item
             item = self.itemAt( event.pos() )
             print item
-            
+
             # if it is a point highlight it, otherwise clear selection
             if isinstance( item, Point ) or isinstance( item, RectPoint ) :
                 if item.isSelected():
@@ -547,11 +556,11 @@ class ImageView( QtGui.QGraphicsView ):
                     item.setSelected(True)
             else:
                 self.scene().clearSelection()
-            
+
         # ZOOM MODE
         elif event.button() == 1 and self.mode == 'zoomMode':
             self.initialZoomPoint = event.pos()
-            
+
         # PAN MODE
         elif event.button() == 1 and self.mode == 'panMode':
             self.lastPos = QtCore.QPoint(QtGui.QCursor.pos())
@@ -561,7 +570,7 @@ class ImageView( QtGui.QGraphicsView ):
 
     def leaveEvent( self, event):
         QtGui.QApplication.restoreOverrideCursor()
-        
+
     def enterEvent( self, event):
         if self.mode == 'drawAxisMode':
             self.setDrawAxisMode()
@@ -571,26 +580,26 @@ class ImageView( QtGui.QGraphicsView ):
     def mouseMoveEvent(self, event):
         # if we have drawn a rectangle
         if self.has_rect:
-    
+
             # get true position
             truepos = self.mapper.map( QtCore.QPointF( self.mapToScene( event.pos() ) ) )
-            
+
             # send message to statusbar
             self.sendSBPosition( truepos )
-        
+
         if self.mode == 'selectMode':
             self.hasMoved = True
             if self.initialSelectionPoint is None:
                 return
-                
+
             # this is the zoom rectangle
             selectionRect = QtCore.QRectF( QtCore.QPointF(self.mapToScene(self.initialSelectionPoint)), QtCore.QPointF( self.mapToScene(event.pos() )))
             # remove old rectangle
             self.scene().removeItem(self.selectionRect)
             # add new rectangle
             self.selectionRect = self.scene().addRect(selectionRect, QtGui.QPen(QtCore.Qt.SolidLine), QtGui.QBrush(QtGui.QColor(187,48,51,10)))
-            
-  
+
+
         elif self.mode == 'zoomMode':
             # if we are is zoom mode
             if self.initialZoomPoint is None:
@@ -602,7 +611,7 @@ class ImageView( QtGui.QGraphicsView ):
             self.scene().removeItem(self.zoomRect)
             # add new rectangle
             self.zoomRect = self.scene().addRect(zoomRect, QtGui.QPen(QtCore.Qt.DashLine), QtGui.QBrush(QtGui.QColor(20,20,250,10)))
-            
+
         elif self.mode == 'panMode':
             if self.lastPos:
                 globalPos = QtGui.QCursor.pos()
@@ -621,7 +630,7 @@ class ImageView( QtGui.QGraphicsView ):
                 self.scene().removeItem(self.zoomRect)
             except:
                 pass
-            
+
         # delete selection rectangle and select points
         if self.initialSelectionPoint and self.hasMoved:
             path = QtGui.QPainterPath()
@@ -645,7 +654,7 @@ class ImageView( QtGui.QGraphicsView ):
             QtGui.QMessageBox.warning(self,
                 "Error",
                 "The inserted point is not valid")
-        
+
         # open dialog
         dialog = QtGui.QInputDialog()
         #dialog.setTextValue( "%f %f" % (self._truePos.x(), self._truePos.y()) )
@@ -659,11 +668,11 @@ class ImageView( QtGui.QGraphicsView ):
                 return None, False
         else:
             return None, False
-            
+
         if len(pos) != 2:
            showError()
            return None, False
-            
+
         return QtCore.QPointF( pos[0], pos[1] ), True
 
     def draw_axis_rect( self ):
@@ -672,25 +681,25 @@ class ImageView( QtGui.QGraphicsView ):
             points = []
             for item in self.axis_points:
                 points.append(  QtCore.QPointF( item.scenePos().x(), item.scenePos().y() ) )
-    
+
             axis_rect = QtGui.QPainterPath( points[0] )
             for i in range(1,4):
                 axis_rect.lineTo( points[i] )
             axis_rect.closeSubpath()
-    
+
             # color of the polygon line
             color = QtGui.QColor("#700094")
-    
+
             # remove old path
             self.scene().removeItem(self.path)
-    
+
             # draw new path
             self.path = self.scene().addPath( axis_rect, QtGui.QPen(color), QtGui.QBrush(QtGui.QColor(50,50,250,5)) )
-            
+
             # compute mapping from scene to true coordinates
             scene_pos = [ (el.scenePos().x(), el.scenePos().y()) for el in self.axis_points]
-            true_pos  = [ (el.truePos().x(), el.truePos().y()) for el in self.axis_points ] 
-            
+            true_pos  = [ (el.truePos().x(), el.truePos().y()) for el in self.axis_points ]
+
             # if the user selects an impossible mapping
             if not self.mapper.fit( scene_pos, true_pos ):
                 self.scene().removeItem(self.path)
@@ -756,7 +765,7 @@ class HelpOverlay(QtGui.QWidget):
 
         # spacing between keys
         spacing = 20
-        
+
         key_order = ['d', 'a', 's', 'z', 'x', 'f', 'o', '?', 'mouse wheel', 'right click on a point', 'double click on a point', 'arrows', 'Ctrl + arrows', 'Shift + arrows', 'Esc']
 
         # write
@@ -803,47 +812,47 @@ class Mapper( object ):
 
 
 class Point( QtGui.QGraphicsItem ):
-    
+
     # class properties
-    size = 0.015 
+    size = 0.015
     edgeColor = QtGui.QColor(0, 0, 0, 200)
     selectedEdgeColor = QtGui.QColor('red')
     faceColor = QtGui.QColor(164, 84, 188, 200)
-    
+
     def __init__ ( self, pointCenter, imageSize, counter ):
         self._truePos = QtCore.QPointF(0,0)
         self.counter = counter
-        
+
         # size of the circle
         self.circleSize = imageSize*self.size
-        
+
         # rect of the circle
         self.rect = QtCore.QRectF( pointCenter.x()-self.circleSize/2, pointCenter.y()-self.circleSize/2, self.circleSize, self.circleSize)
-        
+
         # create  ellipse
         QtGui.QGraphicsItem.__init__(self)
         self.setAcceptHoverEvents( True )
         self.setAcceptDrops(True)
         self.setFlags( QtGui.QGraphicsItem.ItemIsSelectable )
-        
+
     def setTruePos(self, truePos):
         self._truePos = truePos
         self.setToolTip( "Point is at: %.5e, %.5e)" % (self._truePos.x(), self._truePos.y()) )
-    
+
     def truePos(self):
         return self._truePos
-        
+
     def scenePos( self ):
         return QtCore.QPointF( self.rect.x()+self.circleSize/2, self.rect.y()+self.circleSize/2)
-        
+
     def boundingRect(self):
         return QtCore.QRectF( self.rect.x()-self.circleSize,
                               self.rect.y()-self.circleSize,
-                              self.circleSize*3, 
+                              self.circleSize*3,
                               self.circleSize*3)
 
     def paint(self, painter, option, widget):
-       
+
         if self.isSelected():
             ec = self.selectedEdgeColor
         else:
@@ -857,14 +866,14 @@ class Point( QtGui.QGraphicsItem ):
         painter.fillPath(path, QtGui.QBrush(self.faceColor))
         painter.setPen(QtGui.QPen(ec, 1) )
         painter.drawEllipse( self.rect )
-    
+
     def move( self, dx, dy):
         self.prepareGeometryChange()
         self.rect = QtCore.QRectF(self.rect.x()+dx, self.rect.y()+dy, self.circleSize, self.circleSize )
 
 
 class RectPoint( Point ):
-    
+
     # class properties
     size = 0.025
     edgeColor = QtGui.QColor(0, 0, 0, 200)
@@ -873,20 +882,20 @@ class RectPoint( Point ):
 
     def __init__( self, pointCenter, imageSize, counter ):
         super(RectPoint, self).__init__( pointCenter, imageSize,counter )
-        
+
         # the small tet label we show for each rectangle point
         self.textItem = QtGui.QGraphicsTextItem( '(%.2e, %.2e)' % (self._truePos.x(), self._truePos.y()) )
         self.textItem.setPos( self.scenePos().x()-55, self.scenePos().y()-25 )
         self.textItem.setFont(QtGui.QFont('Monospace', 9))
         self.textItem.setParentItem(self)
-        
+
     def setTruePos(self, truePos):
         self._truePos = truePos
         self.setToolTip( "Point %d is at: %.5e, %.5e)" % (self.counter+1, self._truePos.x(), self._truePos.y()) )
         self.textItem.setPlainText( '(%.2e, %.2e)' % (self._truePos.x(), self._truePos.y() ))
-    
+
     def paint(self, painter, option, widget):
-       
+
         if self.isSelected():
             ec = self.selectedEdgeColor
         else:
@@ -900,7 +909,7 @@ class RectPoint( Point ):
         painter.setPen(QtGui.QPen(ec, 0.05*self.circleSize) )
         painter.fillPath(path, QtGui.QBrush(self.faceColor))
         painter.drawEllipse( self.rect )
-        
+
         # draw the cross
         path = QtGui.QPainterPath()
         path.moveTo( self.scenePos().x() - self.circleSize*0.46, self.scenePos().y() )
@@ -910,12 +919,12 @@ class RectPoint( Point ):
         path.moveTo( self.scenePos().x(), self.scenePos().y()+self.circleSize*0.46 )
         path.lineTo( self.scenePos().x(), self.scenePos().y()-self.circleSize*0.46 )
         painter.drawPath(path)
-        
+
     def mouseDoubleClickEvent(self, event):
         truePos, ok = self.scene().views()[0].askTruePos()
         if ok:
             self.setTruePos( truePos )
-            
+
     def move( self, dx, dy):
         self.prepareGeometryChange()
         self.rect = QtCore.QRectF(self.rect.x()+dx, self.rect.y()+dy, self.circleSize, self.circleSize )

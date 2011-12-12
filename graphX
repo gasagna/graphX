@@ -5,27 +5,6 @@ import os
 import numpy as np
 from PyQt4 import QtCore,QtGui
 
-"""WISHES:
-* sistema il drag and drop dei vari elementi
-* mettere icona vicino ad ogni punto con il colore del punto
-* dockbar con tipi di simboli e colori
-* regression tool
-* cursore con zoom
-"""
-
-"""TODO:
-* about window
-* logarithmic mapping
-* quando fai il wheelEvent fai si che zoomi nella posizione voluta.
-* reorder and complete help list
-"""
-
-"""BUGS:
-* selezione dei punti (ctrl)
-* draw_rect ordine dei punti
-* quadrato dello zoom o selezione
-"""
-
 zoomFactor = 1.05
 
 class Main(QtGui.QMainWindow):
